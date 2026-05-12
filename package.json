@@ -1,12 +1,20 @@
 {
-  "name": "react-vite-tailwind",
+  "name": "nakladnoy",
+  "productName": "Накладная",
+  "description": "Программа для создания и печати товарных накладных",
+  "version": "1.0.0",
+  "author": "abdulazizDevop",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron:dev": "concurrently -k -n VITE,ELECTRON -c blue,magenta \"npm:dev\" \"wait-on tcp:5174 && electron .\"",
+    "electron:preview": "npm run build && electron .",
+    "dist:win": "npm run build && electron-builder --win --x64",
+    "dist:mac": "npm run build && electron-builder --mac"
   },
   "dependencies": {
     "clsx": "2.1.1",
@@ -20,11 +28,51 @@
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.1.1",
+    "concurrently": "^9.2.1",
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
     "vite": "7.3.2",
-    "vite-plugin-singlefile": "2.3.0"
+    "vite-plugin-singlefile": "2.3.0",
+    "wait-on": "^9.0.10"
+  },
+  "build": {
+    "appId": "uz.abdulazizdevop.nakladnoy",
+    "productName": "Nakladnoy",
+    "copyright": "Copyright © 2026 abdulazizDevop",
+    "directories": {
+      "output": "release",
+      "buildResources": "build-resources"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Nakladnoy-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Накладная",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.business"
+    }
   }
 }

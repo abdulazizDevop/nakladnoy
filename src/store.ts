@@ -2,7 +2,11 @@ import { AppData, Buyer, Product, Invoice, defaultAppData } from './types';
 
 const STORAGE_KEY = 'invoice_app_data';
 
-// Загрузить данные
+export function isElectron(): boolean {
+  return typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
+}
+
+// Загрузить данные синхронно (из localStorage — быстрый старт)
 export function loadData(): AppData {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -15,12 +19,32 @@ export function loadData(): AppData {
   return { ...defaultAppData };
 }
 
-// Сохранить данные
+// При запуске в Electron подтягиваем данные из файла на диске
+export async function loadFromDisk(): Promise<AppData | null> {
+  if (!isElectron()) return null;
+  try {
+    const fileData = await window.electronAPI!.loadData();
+    if (!fileData) return null;
+    const merged = { ...defaultAppData, ...fileData };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    return merged;
+  } catch (e) {
+    console.error('Ошибка чтения файла:', e);
+    return null;
+  }
+}
+
+// Сохранить: localStorage (мгновенно) + файл (если есть Electron)
 export function saveData(data: AppData): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
-    console.error('Ошибка сохранения данных:', e);
+    console.error('Ошибка localStorage:', e);
+  }
+  if (isElectron()) {
+    window.electronAPI!.saveData(data).catch(err => {
+      console.error('Ошибка записи файла:', err);
+    });
   }
 }
 

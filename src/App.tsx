@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AppData, Invoice } from './types';
 import {
   loadData,
+  loadFromDisk,
   saveInvoice,
   setSupplierName,
   deleteInvoice,
@@ -19,12 +20,12 @@ export default function App() {
   const [view, setView] = useState<View>('form');
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
 
-  // Keep supplier name in sync
+  // On Electron, prefer the on-disk file (authoritative across reinstalls)
   useEffect(() => {
-    if (data.supplierName) {
-      // Already saved
-    }
-  }, [data.supplierName]);
+    loadFromDisk().then(fileData => {
+      if (fileData) setData(fileData);
+    });
+  }, []);
 
   const handleDataChange = (newData: AppData) => {
     setData(newData);
