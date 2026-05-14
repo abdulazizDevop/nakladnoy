@@ -13,57 +13,104 @@ export function formatDate(dateStr: string): string {
 }
 
 export function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
 }
 
-const units = [
+// Числительные мужского рода (рубли, миллионы) и женского (тысячи) отличаются
+// только в формах «один/одна» и «два/две».
+const unitsMasculine = [
   '', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять',
   'десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать',
-  'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'
+  'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать',
+];
+
+const unitsFeminine = [
+  '', 'одна', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять',
+  'десять', 'одиннадцать', 'двенадцать', 'тринадцать', 'четырнадцать', 'пятнадцать',
+  'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать',
 ];
 
 const tens = [
-  '', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто'
+  '', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто',
 ];
 
 const hundreds = [
-  '', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот'
+  '', 'сто', 'двести', 'триста', 'четыреста', 'пятьсот', 'шестьсот', 'семьсот', 'восемьсот', 'девятьсот',
 ];
+
+type Gender = 'm' | 'f';
+
+// Согласование существительного с количеством: «1 рубль / 2 рубля / 5 рублей».
+function plural(n: number, [one, few, many]: [string, string, string]): string {
+  const mod100 = Math.abs(n) % 100;
+  const mod10 = mod100 % 10;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
+function group(n: number, gender: Gender): string {
+  if (n === 0) return '';
+  const units = gender === 'f' ? unitsFeminine : unitsMasculine;
+  if (n < 20) return units[n];
+  if (n < 100) {
+    const t = tens[Math.floor(n / 10)];
+    const u = n % 10 ? ' ' + units[n % 10] : '';
+    return t + u;
+  }
+  const h = hundreds[Math.floor(n / 100)];
+  const rest = n % 100 ? ' ' + group(n % 100, gender) : '';
+  return h + rest;
+}
 
 function numberToWordsHelper(n: number): string {
   if (n === 0) return '';
-  if (n < 20) return units[n];
-  if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + units[n % 10] : '');
-  if (n < 1000) return hundreds[Math.floor(n / 100)] + (n % 100 ? ' ' + numberToWordsHelper(n % 100) : '');
-  if (n < 1000000) {
-    const thousands = Math.floor(n / 1000);
-    let prefix = '';
-    if (thousands === 1) prefix = 'одна тысяча';
-    else if (thousands === 2) prefix = 'две тысячи';
-    else if (thousands >= 3 && thousands <= 4) prefix = numberToWordsHelper(thousands) + ' тысячи';
-    else prefix = numberToWordsHelper(thousands) + ' тысяч';
-    return prefix + (n % 1000 ? ' ' + numberToWordsHelper(n % 1000) : '');
+
+  const billions = Math.floor(n / 1_000_000_000);
+  const millions = Math.floor((n % 1_000_000_000) / 1_000_000);
+  const thousands = Math.floor((n % 1_000_000) / 1_000);
+  const rest = n % 1_000;
+
+  const parts: string[] = [];
+
+  if (billions > 0) {
+    parts.push(
+      group(billions, 'm') +
+        ' ' +
+        plural(billions, ['миллиард', 'миллиарда', 'миллиардов'])
+    );
   }
-  if (n < 1000000000) {
-    const millions = Math.floor(n / 1000000);
-    let prefix = '';
-    if (millions === 1) prefix = 'один миллион';
-    else if (millions >= 2 && millions <= 4) prefix = numberToWordsHelper(millions) + ' миллиона';
-    else prefix = numberToWordsHelper(millions) + ' миллионов';
-    return prefix + (n % 1000000 ? ' ' + numberToWordsHelper(n % 1000000) : '');
+  if (millions > 0) {
+    parts.push(
+      group(millions, 'm') +
+        ' ' +
+        plural(millions, ['миллион', 'миллиона', 'миллионов'])
+    );
   }
-  return n.toString();
+  if (thousands > 0) {
+    parts.push(
+      group(thousands, 'f') +
+        ' ' +
+        plural(thousands, ['тысяча', 'тысячи', 'тысяч'])
+    );
+  }
+  if (rest > 0) {
+    parts.push(group(rest, 'm'));
+  }
+
+  return parts.join(' ');
 }
 
 export function numberToWords(amount: number): string {
   const intPart = Math.floor(amount);
   const kopPart = Math.round((amount - intPart) * 100);
-  
-  if (intPart === 0) {
-    return `Ноль руб. ${kopPart.toString().padStart(2, '0')} коп.`;
-  }
-  
-  const words = numberToWordsHelper(intPart);
+
+  const rubLabel = plural(intPart, ['рубль', 'рубля', 'рублей']);
+  const kopLabel = plural(kopPart, ['копейка', 'копейки', 'копеек']);
+
+  const words = intPart === 0 ? 'ноль' : numberToWordsHelper(intPart);
   const capitalized = words.charAt(0).toUpperCase() + words.slice(1);
-  return `${capitalized} руб. ${kopPart.toString().padStart(2, '0')} коп.`;
+
+  return `${capitalized} ${rubLabel} ${kopPart.toString().padStart(2, '0')} ${kopLabel}`;
 }

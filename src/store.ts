@@ -9,11 +9,19 @@ export function isElectron(): boolean {
 // Подтянуть старое сохранение к актуальной схеме. Например, до 1.3.0 поставщик
 // хранился одной строкой supplierName — теперь это полноценная коллекция
 // suppliers, а supplierName остаётся как «последний выбранный».
-function migrate(raw: Partial<AppData> | null | undefined): AppData {
+// changed === true означает, что схема действительно поменялась и базу стоит
+// сразу пересохранить, чтобы новые поля закрепились на диске.
+function migrate(
+  raw: Partial<AppData> | null | undefined
+): { data: AppData; changed: boolean } {
   const merged: AppData = { ...defaultAppData, ...(raw ?? {}) };
+  let changed = false;
+
   if (!Array.isArray(merged.suppliers)) {
     merged.suppliers = [];
+    changed = true;
   }
+
   // Если в старой базе был supplierName, но нет такого поставщика в списке —
   // добавим его автоматически, чтобы пользователь сразу увидел подсказку.
   const lastName = (merged.supplierName || '').trim();
@@ -30,9 +38,11 @@ function migrate(raw: Partial<AppData> | null | undefined): AppData {
           createdAt: new Date().toISOString(),
         },
       ];
+      changed = true;
     }
   }
-  return merged;
+
+  return { data: merged, changed };
 }
 
 // Загрузить данные синхронно (из localStorage — быстрый старт)
@@ -40,7 +50,16 @@ export function loadData(): AppData {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return migrate(JSON.parse(stored));
+      const { data, changed } = migrate(JSON.parse(stored));
+      if (changed) {
+        // Не дожидаемся записи на диск — это и так fire-and-forget
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {
+          console.error('Не удалось закрепить миграцию в localStorage:', e);
+        }
+      }
+      return data;
     }
   } catch (e) {
     console.error('Ошибка загрузки данных:', e);
@@ -54,9 +73,17 @@ export async function loadFromDisk(): Promise<AppData | null> {
   try {
     const fileData = await window.electronAPI!.loadData();
     if (!fileData) return null;
-    const merged = migrate(fileData);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-    return merged;
+    const { data, changed } = migrate(fileData);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    if (changed) {
+      // Закрепляем мигрированные поля сразу же, чтобы id новых записей
+      // (например, автоматически добавленного поставщика) не менялся между
+      // загрузками.
+      window.electronAPI!.saveData(data).catch(err => {
+        console.error('Не удалось сохранить миграцию в файл:', err);
+      });
+    }
+    return data;
   } catch (e) {
     console.error('Ошибка чтения файла:', e);
     return null;

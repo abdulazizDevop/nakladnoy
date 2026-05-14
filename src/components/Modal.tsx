@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 
 interface Props {
   isOpen: boolean;
@@ -8,6 +8,19 @@ interface Props {
 }
 
 export default function Modal({ isOpen, onClose, title, children }: Props) {
+  // Esc закрывает модальное окно — стандартное поведение десктопного UI.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (

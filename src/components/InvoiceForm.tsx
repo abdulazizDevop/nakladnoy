@@ -8,6 +8,7 @@ import {
   deleteBuyer,
   deleteProduct,
   deleteSupplier,
+  findProductByName,
   updateBuyer,
   updateProduct,
   updateSupplier,
@@ -135,9 +136,36 @@ export default function InvoiceForm({
   };
 
   const handleAddProduct = () => {
-    if (!newProduct.name.trim()) return;
+    const trimmed = newProduct.name.trim();
+    if (!trimmed) return;
+
+    const existing = findProductByName(data, trimmed);
+
+    // Если такой товар уже есть, а пользователь явно открыл модалку
+    // «Добавить товар» с другой ценой/единицей — он хочет обновить справочник.
+    if (existing) {
+      const priceChanged = existing.price !== newProduct.price;
+      const unitChanged = existing.unit !== newProduct.unit;
+      if (priceChanged || unitChanged) {
+        const ok = confirm(
+          `Товар «${existing.name}» уже есть (${existing.unit}, ${existing.price} руб.).\n\n` +
+            `Обновить на ${newProduct.unit}, ${newProduct.price} руб.?`
+        );
+        if (ok) {
+          const updated = updateProduct(data, existing.id, {
+            unit: newProduct.unit,
+            price: newProduct.price,
+          });
+          onDataChange(updated);
+        }
+      }
+      setNewProduct({ name: '', unit: 'шт.', price: 0 });
+      setShowAddProduct(false);
+      return;
+    }
+
     const { data: updated } = addProduct(data, {
-      name: newProduct.name.trim(),
+      name: trimmed,
       unit: newProduct.unit,
       price: newProduct.price,
     });

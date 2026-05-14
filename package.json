@@ -2,7 +2,7 @@
   "name": "nakladnoy",
   "productName": "Накладная",
   "description": "Программа для создания и печати товарных накладных",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "author": "abdulazizDevop",
   "private": true,
   "main": "electron/main.cjs",
@@ -12,8 +12,11 @@
     "preview": "vite preview",
     "electron:dev": "concurrently -k -n VITE,ELECTRON -c blue,magenta \"npm:dev\" \"wait-on tcp:5174 && cross-env ELECTRON_RUN_AS_NODE= electron .\"",
     "electron:preview": "npm run build && cross-env ELECTRON_RUN_AS_NODE= electron .",
-    "dist:win": "npm run build && electron-builder --win --x64",
-    "dist:mac": "npm run build && electron-builder --mac"
+    "make:icon": "node scripts/make-icon.cjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dist:win": "npm run make:icon && npm run build && electron-builder --win --x64",
+    "dist:mac": "npm run make:icon && npm run build && electron-builder --mac"
   },
   "dependencies": {
     "clsx": "2.1.1",
@@ -31,10 +34,12 @@
     "cross-env": "^10.1.0",
     "electron": "^33.4.11",
     "electron-builder": "^26.8.1",
+    "sharp": "^0.34.5",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
     "vite": "7.3.2",
     "vite-plugin-singlefile": "2.3.0",
+    "vitest": "^4.1.6",
     "wait-on": "^9.0.10"
   },
   "build": {

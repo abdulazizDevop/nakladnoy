@@ -51,6 +51,19 @@ function safeParse(raw) {
   }
 }
 
+// Минимальная проверка, что файл — это действительно база накладной, а не,
+// скажем, чужой package.json или произвольный JSON.
+function looksLikeAppData(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  const arrayKeys = ['buyers', 'products', 'invoices'];
+  // Допускаем отсутствие ключа (старые версии), но если он есть — должен быть массивом
+  for (const key of arrayKeys) {
+    if (key in obj && !Array.isArray(obj[key])) return false;
+  }
+  // Хотя бы один из ключей должен присутствовать — иначе это что-то постороннее
+  return arrayKeys.some(k => k in obj);
+}
+
 // === Бекапы ===
 function listBackupFiles() {
   const dir = backupsDir();
@@ -222,6 +235,22 @@ function createWindow() {
   }
 }
 
+// Только один экземпляр программы — если пользователь дважды кликнул по ярлыку,
+// второй процесс не открывает новое окно и не конкурирует за data.json.
+// Просто активируем уже работающее окно.
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+  return;
+}
+
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
 app.whenReady().then(() => {
   // Базовый каталог
   ensureDir(dataDir());
@@ -322,8 +351,11 @@ app.whenReady().then(() => {
     try {
       const raw = fs.readFileSync(res.filePaths[0], 'utf-8');
       const parsed = safeParse(raw);
-      if (!parsed || typeof parsed !== 'object') {
-        return { ok: false, error: 'Файл не похож на базу данных' };
+      if (!looksLikeAppData(parsed)) {
+        return {
+          ok: false,
+          error: 'Файл не похож на базу данных (ожидаются поля buyers / products / invoices)',
+        };
       }
       writeData(parsed);
       return { ok: true, data: parsed };
