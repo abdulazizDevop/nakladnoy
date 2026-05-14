@@ -20,6 +20,8 @@ interface Props {
   onGenerate: (invoice: Invoice, data: AppData) => void;
   onShowHistory: () => void;
   onShowSettings: () => void;
+  editingInvoice?: Invoice | null;
+  onCancelEdit?: () => void;
 }
 
 export default function InvoiceForm({
@@ -28,16 +30,29 @@ export default function InvoiceForm({
   onGenerate,
   onShowHistory,
   onShowSettings,
+  editingInvoice,
+  onCancelEdit,
 }: Props) {
-  const invoiceNumber = peekNextInvoiceNumber(data);
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [supplierFrom, setSupplierFrom] = useState(data.supplierName || '');
-  const [buyerName, setBuyerName] = useState('');
-  const [buyerId, setBuyerId] = useState<string | undefined>();
-  const [items, setItems] = useState<InvoiceItem[]>([
-    { id: generateId(), name: '', unit: 'шт.', quantity: 1, price: 0, amount: 0 },
-  ]);
-  const [note, setNote] = useState('');
+  const isEditing = !!editingInvoice;
+  const invoiceNumber = editingInvoice
+    ? editingInvoice.invoiceNumber
+    : peekNextInvoiceNumber(data);
+  const [invoiceDate, setInvoiceDate] = useState(
+    editingInvoice?.invoiceDate ?? new Date().toISOString().split('T')[0]
+  );
+  const [supplierFrom, setSupplierFrom] = useState(
+    editingInvoice?.supplierFrom ?? data.supplierName ?? ''
+  );
+  const [buyerName, setBuyerName] = useState(editingInvoice?.buyerName ?? '');
+  const [buyerId, setBuyerId] = useState<string | undefined>(
+    editingInvoice?.buyerId
+  );
+  const [items, setItems] = useState<InvoiceItem[]>(
+    editingInvoice
+      ? editingInvoice.items.map(it => ({ ...it }))
+      : [{ id: generateId(), name: '', unit: 'шт.', quantity: 1, price: 0, amount: 0 }]
+  );
+  const [note, setNote] = useState(editingInvoice?.note ?? '');
 
   // Modals
   const [showAddBuyer, setShowAddBuyer] = useState(false);
@@ -47,10 +62,12 @@ export default function InvoiceForm({
   const [newBuyerName, setNewBuyerName] = useState('');
   const [newProduct, setNewProduct] = useState({ name: '', unit: 'шт.', price: 0 });
 
-  // Update supplier from data
+  // Update supplier from data — но при редактировании не затираем то, что
+  // было в исходной накладной.
   useEffect(() => {
+    if (isEditing) return;
     setSupplierFrom(data.supplierName || '');
-  }, [data.supplierName]);
+  }, [data.supplierName, isEditing]);
 
   const buyerOptions = data.buyers.map(b => ({ id: b.id, label: b.name }));
   const productOptions = data.products.map(p => ({ 
@@ -130,9 +147,9 @@ export default function InvoiceForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const invoice: Invoice = {
-      id: generateId(),
+      id: editingInvoice ? editingInvoice.id : generateId(),
       invoiceNumber,
       invoiceDate,
       supplierFrom,
@@ -145,7 +162,7 @@ export default function InvoiceForm({
       totalQuantity,
       totalAmount,
       note,
-      createdAt: new Date().toISOString(),
+      createdAt: editingInvoice ? editingInvoice.createdAt : new Date().toISOString(),
     };
 
     onGenerate(invoice, data);
@@ -155,18 +172,73 @@ export default function InvoiceForm({
     'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200';
   const labelClass = 'block text-xs font-semibold text-gray-600 mb-1';
 
+  // Не даём Enter в обычных полях ввода отправлять форму — иначе пользователь
+  // случайно нажимает Enter в поле количества/цены и уходит на предпросмотр.
+  // Textarea (примечание) и обработчики SearchInput продолжают работать как
+  // прежде — SearchInput сам вызывает preventDefault на Enter при выборе.
+  const blockEnterSubmit = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key !== 'Enter') return;
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT') {
+      e.preventDefault();
+    }
+  };
+
   return (
     <>
-      <form onSubmit={handleSubmit} className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
+      <form
+        onSubmit={handleSubmit}
+        onKeyDown={blockEnterSubmit}
+        className="mx-auto max-w-5xl space-y-6 p-4 md:p-8"
+      >
         {/* Header */}
         <div className="text-center">
-          <div className="inline-flex items-center gap-3 rounded-2xl bg-linear-to-r from-blue-600 to-indigo-600 px-6 py-3 shadow-lg shadow-blue-200">
-            <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <div
+            className={
+              'inline-flex items-center gap-3 rounded-2xl px-6 py-3 shadow-lg ' +
+              (isEditing
+                ? 'bg-linear-to-r from-amber-500 to-orange-500 shadow-orange-200'
+                : 'bg-linear-to-r from-blue-600 to-indigo-600 shadow-blue-200')
+            }
+          >
+            <svg
+              className="h-7 w-7 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
-            <h1 className="text-xl font-bold text-white">Товарная Накладная</h1>
+            <h1 className="text-xl font-bold text-white">
+              {isEditing
+                ? `Редактирование накладной №${invoiceNumber}`
+                : 'Товарная Накладная'}
+            </h1>
           </div>
         </div>
+
+        {isEditing && (
+          <div className="flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <span>
+              Вы изменяете существующую накладную. Номер и дата создания
+              сохранятся. После сохранения откроется предпросмотр.
+            </span>
+            {onCancelEdit && (
+              <button
+                type="button"
+                onClick={onCancelEdit}
+                className="ml-3 rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+              >
+                Отменить
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex flex-wrap justify-center gap-2">
@@ -440,15 +512,29 @@ export default function InvoiceForm({
         </div>
 
         {/* Submit */}
-        <div className="flex justify-center">
+        <div className="flex flex-wrap justify-center gap-3">
+          {isEditing && onCancelEdit && (
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-6 py-3 text-base font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              Отменить
+            </button>
+          )}
           <button
             type="submit"
-            className="inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-blue-600 to-indigo-600 px-8 py-3 text-base font-bold text-white shadow-lg shadow-blue-200 transition hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl active:scale-[0.98]"
+            className={
+              'inline-flex items-center gap-2 rounded-xl px-8 py-3 text-base font-bold text-white shadow-lg transition hover:shadow-xl active:scale-[0.98] ' +
+              (isEditing
+                ? 'bg-linear-to-r from-amber-500 to-orange-500 shadow-orange-200 hover:from-amber-600 hover:to-orange-600'
+                : 'bg-linear-to-r from-blue-600 to-indigo-600 shadow-blue-200 hover:from-blue-700 hover:to-indigo-700')
+            }
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            Сформировать накладную
+            {isEditing ? 'Сохранить изменения' : 'Сформировать накладную'}
           </button>
         </div>
       </form>

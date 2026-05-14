@@ -20,6 +20,7 @@ export default function App() {
   const [data, setData] = useState<AppData>(loadData);
   const [view, setView] = useState<View>('form');
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
 
   // On Electron, prefer the on-disk file (authoritative across reinstalls)
   useEffect(() => {
@@ -63,6 +64,7 @@ export default function App() {
     updatedData = saveInvoice(updatedData, enriched);
     setData(updatedData);
     setCurrentInvoice(enriched);
+    setEditingInvoice(null);
     setView('preview');
     window.scrollTo(0, 0);
   };
@@ -70,6 +72,7 @@ export default function App() {
   const handleBack = () => {
     setView('form');
     setCurrentInvoice(null);
+    setEditingInvoice(null);
     // Reload data to get fresh invoice number
     setData(loadData());
     window.scrollTo(0, 0);
@@ -88,6 +91,17 @@ export default function App() {
     setView('preview');
   };
 
+  const handleEditInvoice = (invoice: Invoice) => {
+    setEditingInvoice(invoice);
+    setView('form');
+    window.scrollTo(0, 0);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingInvoice(null);
+    setView('history');
+  };
+
   const handleDeleteInvoice = (id: string) => {
     const updated = deleteInvoice(data, id);
     setData(updated);
@@ -98,6 +112,7 @@ export default function App() {
       <InvoiceHistory
         invoices={data.invoices}
         onView={handleViewInvoice}
+        onEdit={handleEditInvoice}
         onDelete={handleDeleteInvoice}
         onClose={() => setView('form')}
       />
@@ -121,11 +136,16 @@ export default function App() {
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 pb-12">
       <InvoiceForm
+        // remounting on switch keeps form state in sync with the
+        // editingInvoice argument (state initializers re-run on mount)
+        key={editingInvoice ? `edit-${editingInvoice.id}` : 'new'}
         data={data}
         onDataChange={handleDataChange}
         onGenerate={handleGenerate}
         onShowHistory={handleShowHistory}
         onShowSettings={handleShowSettings}
+        editingInvoice={editingInvoice}
+        onCancelEdit={handleCancelEdit}
       />
     </div>
   );

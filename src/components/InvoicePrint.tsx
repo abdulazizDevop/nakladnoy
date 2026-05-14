@@ -124,15 +124,15 @@ export default function InvoicePrint({ invoice, onBack }: Props) {
               <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatNumber(item.quantity * item.price)}</td>
             </tr>
           ))}
-        </tbody>
-        <tfoot>
+          {/* Итого внутри tbody, чтобы строка не повторялась браузером на каждой
+              печатной странице (как это делает tfoot по умолчанию). */}
           <tr style={{ background: '#f3f4f6', fontWeight: 700 }}>
             <td colSpan={3} style={{ ...tdStyle, textAlign: 'right', color: '#444' }}>Итого:</td>
             <td style={{ ...tdStyle, textAlign: 'center' }}>{invoice.totalQuantity}</td>
             <td style={{ ...tdStyle, textAlign: 'center', color: '#aaa' }}>—</td>
             <td style={{ ...tdStyle, textAlign: 'right', color: '#111' }}>{formatNumber(invoice.totalAmount)}</td>
           </tr>
-        </tfoot>
+        </tbody>
       </table>
 
       {/* Итого текстом */}
