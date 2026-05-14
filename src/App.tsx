@@ -12,8 +12,9 @@ import {
 import InvoiceForm from './components/InvoiceForm';
 import InvoicePrint from './components/InvoicePrint';
 import InvoiceHistory from './components/InvoiceHistory';
+import Settings from './components/Settings';
 
-type View = 'form' | 'preview' | 'history';
+type View = 'form' | 'preview' | 'history' | 'settings';
 
 export default function App() {
   const [data, setData] = useState<AppData>(loadData);
@@ -78,6 +79,10 @@ export default function App() {
     setView('history');
   };
 
+  const handleShowSettings = () => {
+    setView('settings');
+  };
+
   const handleViewInvoice = (invoice: Invoice) => {
     setCurrentInvoice(invoice);
     setView('preview');
@@ -99,17 +104,28 @@ export default function App() {
     );
   }
 
+  if (view === 'settings') {
+    return (
+      <Settings
+        data={data}
+        onDataChange={handleDataChange}
+        onClose={() => setView('form')}
+      />
+    );
+  }
+
   if (view === 'preview' && currentInvoice) {
     return <InvoicePrint invoice={currentInvoice} onBack={handleBack} />;
   }
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 pb-12">
-      <InvoiceForm 
+      <InvoiceForm
         data={data}
         onDataChange={handleDataChange}
-        onGenerate={handleGenerate} 
+        onGenerate={handleGenerate}
         onShowHistory={handleShowHistory}
+        onShowSettings={handleShowSettings}
       />
     </div>
   );
