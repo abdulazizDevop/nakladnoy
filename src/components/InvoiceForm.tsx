@@ -7,8 +7,10 @@ import {
   addProduct,
   deleteBuyer,
   deleteProduct,
+  deleteSupplier,
   updateBuyer,
   updateProduct,
+  updateSupplier,
 } from '../store';
 import SearchInput from './SearchInput';
 import Modal from './Modal';
@@ -59,6 +61,7 @@ export default function InvoiceForm({
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showManageBuyers, setShowManageBuyers] = useState(false);
   const [showManageProducts, setShowManageProducts] = useState(false);
+  const [showManageSuppliers, setShowManageSuppliers] = useState(false);
   const [newBuyerName, setNewBuyerName] = useState('');
   const [newProduct, setNewProduct] = useState({ name: '', unit: 'шт.', price: 0 });
 
@@ -70,8 +73,9 @@ export default function InvoiceForm({
   }, [data.supplierName, isEditing]);
 
   const buyerOptions = data.buyers.map(b => ({ id: b.id, label: b.name }));
-  const productOptions = data.products.map(p => ({ 
-    id: p.id, 
+  const supplierOptions = data.suppliers.map(s => ({ id: s.id, label: s.name }));
+  const productOptions = data.products.map(p => ({
+    id: p.id,
     label: p.name,
     unit: p.unit,
     price: p.price,
@@ -335,17 +339,26 @@ export default function InvoiceForm({
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-gray-800">
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-xs font-bold text-green-700">2</span>
-            Поставщик
+            Поставщик (Продавец)
+            <span className="ml-2 text-xs font-normal text-gray-500">
+              ({data.suppliers.length} в базе)
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowManageSuppliers(true)}
+              className="ml-auto text-xs font-semibold text-green-700 hover:underline"
+            >
+              📋 Список
+            </button>
           </h2>
           <div>
-            <label className={labelClass}>Название</label>
-            <input
-              type="text"
-              className={inputClass}
-              placeholder='ООО "Альфа"'
+            <label className={labelClass}>Название (поиск или введите новое)</label>
+            <SearchInput
               value={supplierFrom}
-              onChange={e => setSupplierFrom(e.target.value)}
-              required
+              onChange={val => setSupplierFrom(val)}
+              onSelect={opt => setSupplierFrom(opt.label)}
+              options={supplierOptions}
+              placeholder='Начните вводить — например, ООО "Альфа"'
             />
           </div>
         </div>
@@ -644,6 +657,17 @@ export default function InvoiceForm({
         }))}
         onDelete={id => onDataChange(deleteProduct(data, id))}
         onRename={(id, name) => onDataChange(updateProduct(data, id, { name }))}
+      />
+
+      {/* Manage Suppliers */}
+      <ManageList
+        isOpen={showManageSuppliers}
+        onClose={() => setShowManageSuppliers(false)}
+        title="Поставщики (продавцы)"
+        emptyText="Поставщиков пока нет"
+        items={data.suppliers.map(s => ({ id: s.id, name: s.name }))}
+        onDelete={id => onDataChange(deleteSupplier(data, id))}
+        onRename={(id, name) => onDataChange(updateSupplier(data, id, name))}
       />
     </>
   );

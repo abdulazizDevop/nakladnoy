@@ -1,4 +1,4 @@
-import { AppData, Buyer, Product, Invoice, defaultAppData } from './types';
+import { AppData, Buyer, Product, Invoice, Supplier, defaultAppData } from './types';
 
 const STORAGE_KEY = 'invoice_app_data';
 
@@ -6,12 +6,41 @@ export function isElectron(): boolean {
   return typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
 }
 
+// Подтянуть старое сохранение к актуальной схеме. Например, до 1.3.0 поставщик
+// хранился одной строкой supplierName — теперь это полноценная коллекция
+// suppliers, а supplierName остаётся как «последний выбранный».
+function migrate(raw: Partial<AppData> | null | undefined): AppData {
+  const merged: AppData = { ...defaultAppData, ...(raw ?? {}) };
+  if (!Array.isArray(merged.suppliers)) {
+    merged.suppliers = [];
+  }
+  // Если в старой базе был supplierName, но нет такого поставщика в списке —
+  // добавим его автоматически, чтобы пользователь сразу увидел подсказку.
+  const lastName = (merged.supplierName || '').trim();
+  if (lastName) {
+    const exists = merged.suppliers.some(
+      s => normalize(s.name) === normalize(lastName)
+    );
+    if (!exists) {
+      merged.suppliers = [
+        ...merged.suppliers,
+        {
+          id: generateId(),
+          name: lastName,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+    }
+  }
+  return merged;
+}
+
 // Загрузить данные синхронно (из localStorage — быстрый старт)
 export function loadData(): AppData {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return { ...defaultAppData, ...JSON.parse(stored) };
+      return migrate(JSON.parse(stored));
     }
   } catch (e) {
     console.error('Ошибка загрузки данных:', e);
@@ -25,7 +54,7 @@ export async function loadFromDisk(): Promise<AppData | null> {
   try {
     const fileData = await window.electronAPI!.loadData();
     if (!fileData) return null;
-    const merged = { ...defaultAppData, ...fileData };
+    const merged = migrate(fileData);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
     return merged;
   } catch (e) {
@@ -90,6 +119,48 @@ export function updateBuyer(data: AppData, id: string, name: string): AppData {
 
 export function deleteBuyer(data: AppData, id: string): AppData {
   const updated = { ...data, buyers: data.buyers.filter(b => b.id !== id) };
+  saveData(updated);
+  return updated;
+}
+
+// === Поставщики (продавцы) ===
+export function findSupplierByName(data: AppData, name: string): Supplier | undefined {
+  const key = normalize(name);
+  return data.suppliers.find(s => normalize(s.name) === key);
+}
+
+export function addSupplier(
+  data: AppData,
+  name: string
+): { data: AppData; supplier: Supplier } {
+  const trimmed = name.trim();
+  const existing = findSupplierByName(data, trimmed);
+  if (existing) {
+    return { data, supplier: existing };
+  }
+  const supplier: Supplier = {
+    id: generateId(),
+    name: trimmed,
+    createdAt: new Date().toISOString(),
+  };
+  const updated = { ...data, suppliers: [...data.suppliers, supplier] };
+  saveData(updated);
+  return { data: updated, supplier };
+}
+
+export function updateSupplier(data: AppData, id: string, name: string): AppData {
+  const updated = {
+    ...data,
+    suppliers: data.suppliers.map(s =>
+      s.id === id ? { ...s, name: name.trim() } : s
+    ),
+  };
+  saveData(updated);
+  return updated;
+}
+
+export function deleteSupplier(data: AppData, id: string): AppData {
+  const updated = { ...data, suppliers: data.suppliers.filter(s => s.id !== id) };
   saveData(updated);
   return updated;
 }

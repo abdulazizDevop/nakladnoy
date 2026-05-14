@@ -8,6 +8,7 @@ import {
   deleteInvoice,
   addBuyer,
   addProduct,
+  addSupplier,
 } from './store';
 import InvoiceForm from './components/InvoiceForm';
 import InvoicePrint from './components/InvoicePrint';
@@ -36,8 +37,15 @@ export default function App() {
   const handleGenerate = (invoice: Invoice, appData: AppData) => {
     let updatedData = appData;
 
-    if (invoice.supplierFrom && invoice.supplierFrom !== appData.supplierName) {
-      updatedData = setSupplierName(updatedData, invoice.supplierFrom);
+    // Auto-save supplier name into the suppliers directory so it appears in
+    // the autocomplete next time. supplierName also gets updated so the next
+    // new invoice pre-fills with the most recently used supplier.
+    if (invoice.supplierFrom.trim()) {
+      const res = addSupplier(updatedData, invoice.supplierFrom);
+      updatedData = res.data;
+      if (invoice.supplierFrom !== updatedData.supplierName) {
+        updatedData = setSupplierName(updatedData, res.supplier.name);
+      }
     }
 
     // Auto-save new buyer if name doesn't match an existing one
